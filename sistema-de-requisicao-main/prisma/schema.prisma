@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String?  @unique
+  
+  // Relacionamentos
+  users       User[]
+  sectors     Sector[]
+  items       Item[]
+  requisitions Requisition[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  REPOSITOR
+  ESTOQUISTA
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(ADMIN)
+  
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Sector {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+  
+  items     Item[]
+  requisitions Requisition[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Item {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  unit      String   @default("UN")
+  cost      Float?   
+  
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+
+  sectors        Sector[]
+  requisitionItems RequisitionItem[]
+  
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Requisition {
+  id        String   @id @default(cuid())
+  
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+  
+  sectorId  String
+  sector    Sector   @relation(fields: [sectorId], references: [id])
+  
+  items     RequisitionItem[]
+  
+  status    String   @default("CONCLUIDA")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RequisitionItem {
+  id            String   @id @default(cuid())
+  
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  
+  itemId        String
+  item          Item     @relation(fields: [itemId], references: [id])
+  
+  quantity      Float
+}
