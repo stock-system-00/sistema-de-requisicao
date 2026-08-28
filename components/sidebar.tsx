@@ -1,7 +1,7 @@
 // components/sidebar.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -57,29 +57,28 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   useEffect(() => {
     // 1. Tenta pegar os dados cacheados na sessão
     const cachedUser = sessionStorage.getItem("@req-user");
-
     if (cachedUser) {
       setUser(JSON.parse(cachedUser));
-      return;
-    }
-
-    // 2. Se não tiver cache, busca no BD e salva para a próxima vez
-    getUsuarioAtual().then((data) => {
-      if (data) {
-        setUser(data);
-        sessionStorage.setItem("@req-user", JSON.stringify(data));
-      }
-    });
-  }, []);
-
-  // Busca os dados de armazenamento do banco sempre que o modal for aberto
-  useEffect(() => {
-    if (isDbModalOpen) {
-      getDbStorageUsage().then((data) => {
-        setStorage(data);
+    } else {
+      getUsuarioAtual().then((data) => {
+        if (data) {
+          setUser(data);
+          sessionStorage.setItem("@req-user", JSON.stringify(data));
+        }
       });
     }
-  }, [isDbModalOpen]);
+
+    // Busca também os dados de memória no carregamento para ser instantâneo
+    const cachedStorage = sessionStorage.getItem("@req-storage");
+    if (cachedStorage) {
+      setStorage(JSON.parse(cachedStorage));
+    } else {
+      getDbStorageUsage().then((data) => {
+        setStorage(data);
+        sessionStorage.setItem("@req-storage", JSON.stringify(data));
+      });
+    }
+  }, []);
 
   async function handleLogout() {
     sessionStorage.removeItem("@req-user");
@@ -87,7 +86,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     router.push("/login");
   }
 
-  // Define a cor da barra baseada na porcentagem de uso (Verde -> Amarelo -> Vermelho)
   const getProgressBarColor = (pct: number) => {
     if (pct >= 80) return "bg-red-500";
     if (pct >= 50) return "bg-amber-500";
@@ -99,6 +97,73 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     if (pct >= 50) return "Uso moderado do sistema.";
     return "Tudo tranquilo, muito espaço disponível.";
   };
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleExportBackup() {
+    try {
+      setIsExporting(true);
+      const res = await fetch("/api/backup");
+      if (!res.ok) throw new Error("Falha ao gerar backup");
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup_sistema_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao baixar backup.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm("ATENÇÃO: A importação apagará TODOS os dados atuais do sistema e os substituirá pelo arquivo de backup. Deseja continuar?")) {
+       if (fileInputRef.current) fileInputRef.current.value = "";
+       return;
+    }
+
+    try {
+      setIsImporting(true);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const jsonStr = event.target?.result as string;
+        try {
+          const res = await fetch("/api/backup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: jsonStr,
+          });
+          
+          if (!res.ok) throw new Error("Erro na restauração.");
+          alert("Backup restaurado com sucesso! A página será recarregada.");
+          sessionStorage.clear();
+          window.location.reload();
+        } catch (err) {
+          console.error(err);
+          alert("Erro ao restaurar backup. Verifique se o arquivo é válido.");
+        } finally {
+          setIsImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+      };
+      reader.readAsText(file);
+    } catch (err) {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   return (
     <>
@@ -236,9 +301,42 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               </div>
             </div>
 
+            {/* Ações de Backup */}
+            <div className="pt-2">
+               <h4 className="text-sm font-semibold mb-3">Segurança e Backup</h4>
+               <div className="flex flex-col sm:flex-row gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1" 
+                    onClick={handleExportBackup}
+                    disabled={isExporting || isImporting}
+                  >
+                     {isExporting ? "Baixando..." : "Baixar Backup"}
+                  </Button>
+                  
+                  <div className="flex-1">
+                     <input 
+                        type="file" 
+                        accept=".json" 
+                        ref={fileInputRef} 
+                        onChange={handleImportBackup} 
+                        className="hidden" 
+                     />
+                     <Button 
+                       variant="destructive" 
+                       className="w-full bg-red-600/10 text-red-600 hover:bg-red-600 hover:text-white border-0" 
+                       onClick={() => fileInputRef.current?.click()}
+                       disabled={isExporting || isImporting}
+                     >
+                       {isImporting ? "Restaurando..." : "Importar Backup"}
+                     </Button>
+                  </div>
+               </div>
+            </div>
+
             <p className="text-xs text-muted-foreground text-center">
               Este espaço armazena com segurança todos os seus produtos, setores
-              e o histórico de requisições da empresa.
+              e o histórico de requisições da empresa. O backup garante que você não perca nada.
             </p>
           </div>
         </DialogContent>

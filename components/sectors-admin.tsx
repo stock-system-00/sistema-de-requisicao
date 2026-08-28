@@ -7,6 +7,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
   ExclamationTriangleIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,6 +113,24 @@ export function SectorsAdmin() {
     setOpen(false);
   }
 
+  function handleExportSectors() {
+    if (sectors.length === 0) {
+      alert("Não há setores cadastrados para exportar.");
+      return;
+    }
+    const headers = ["Codigo", "Nome"];
+    const rows = sectors.map((s) => `${s.code};"${s.name.replace(/"/g, '""')}"`);
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "setores_cadastrados.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   async function confirmDelete() {
     if (!sectorToDelete) return;
 
@@ -134,11 +153,17 @@ export function SectorsAdmin() {
         <h2 className="font-semibold">
           Setores cadastrados ({sectors.length})
         </h2>
-        <Button size="lg" className="h-11" onClick={openNew}>
-          <PlusIcon className="size-5" />
-          <span className="hidden sm:inline">Novo Setor</span>
-          <span className="sm:hidden">Novo</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="lg" className="h-11" onClick={handleExportSectors} disabled={sectors.length === 0}>
+            <ArrowDownTrayIcon className="size-5 mr-1" />
+            <span className="hidden sm:inline">Baixar Dados</span>
+          </Button>
+          <Button size="lg" className="h-11" onClick={openNew}>
+            <PlusIcon className="size-5" />
+            <span className="hidden sm:inline">Novo Setor</span>
+            <span className="sm:hidden">Novo</span>
+          </Button>
+        </div>
       </div>
 
       {loading ? (

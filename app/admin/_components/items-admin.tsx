@@ -37,7 +37,6 @@ import {
   createItem,
   updateItem,
   deleteItem,
-  deleteAllItems,
   bulkImportData,
 } from "@/app/actions/items";
 import { getSectors } from "@/app/actions/sectors";
@@ -253,36 +252,33 @@ export function ItemsAdmin() {
     );
   }
 
-  function handleDeleteAll() {
+  function handleExportItems() {
     if (items.length === 0) {
-      showAlert("Lista Vazia", "Não há itens cadastrados para excluir.");
+      showAlert("Lista Vazia", "Não há itens cadastrados para exportar.");
       return;
     }
 
-    showConfirm(
-      "Excluir TODOS os itens",
-      "Tem certeza absoluta de que deseja EXCLUIR TODOS os itens cadastrados?\n\nEsta ação limpará completamente a tabela atual e não pode ser desfeita facilmente.",
-      async () => {
-        setIsConfirming(true);
-        setLoading(true);
-        const res = await deleteAllItems();
-        setIsConfirming(false);
-        if (res.success) {
-          closeFeedback();
-          await loadData();
-          showAlert(
-            "Sucesso",
-            "Todos os itens foram excluídos da base de dados.",
-          );
-        } else {
-          showAlert(
-            "Erro Grave",
-            res.error || "Erro ao excluir itens. Tente novamente.",
-          );
-          setLoading(false);
-        }
-      },
-    );
+    const headers = ["Codigo", "Descricao", "Unidade", "Custo", "Setores"];
+    const rows = items.map((it) => {
+      const sectors = it.sectors.map((s) => s.name).join(", ");
+      return [
+        it.code,
+        `"${it.name.replace(/"/g, '""')}"`,
+        it.unit,
+        it.cost || "",
+        `"${sectors.replace(/"/g, '""')}"`,
+      ].join(";");
+    });
+    
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "itens_cadastrados.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   async function handleImport(data: SmartImportData) {
@@ -330,9 +326,9 @@ export function ItemsAdmin() {
             <PlusIcon className="size-5 mr-1" />
             Novo Item
           </Button>
-          <Button variant="destructive" onClick={handleDeleteAll} disabled={items.length === 0}>
-            <TrashIcon className="size-5 mr-1" />
-            <span className="hidden sm:inline">Excluir Tudo</span>
+          <Button variant="outline" onClick={handleExportItems} disabled={items.length === 0}>
+            <ArrowDownTrayIcon className="size-5 mr-1" />
+            <span className="hidden sm:inline">Baixar Dados</span>
           </Button>
         </div>
       </div>
