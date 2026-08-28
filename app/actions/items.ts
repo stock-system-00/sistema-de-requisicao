@@ -138,23 +138,27 @@ export async function deleteAllItems() {
   try {
     const storeId = await getDefaultStoreId();
 
-    await prisma.item.updateMany({
+    // 1. Hard delete todos os itens desta loja
+    await prisma.item.deleteMany({
       where: {
         storeId,
-        isActive: true,
       },
-      data: {
-        isActive: false,
+    });
+
+    // 2. Hard delete todos os setores desta loja
+    await prisma.sector.deleteMany({
+      where: {
+        storeId,
       },
     });
 
     revalidatePath("/admin");
     return { success: true };
   } catch (error) {
-    console.error("Erro ao excluir todos os itens:", error);
+    console.error("Erro ao excluir todos os itens e setores:", error);
     return {
       success: false,
-      error: "Não foi possível excluir todos os itens.",
+      error: "Não foi possível excluir os itens e setores do banco.",
     };
   }
 }
@@ -165,7 +169,7 @@ export async function bulkImportData(data: {
     name: string;
     unit: string;
     cost?: number;
-    sectorCodes: string[];
+    sectorPairs: { code: string; name: string }[];
   }[];
   sectors: { code: string; name: string }[];
 }) {
@@ -175,16 +179,17 @@ export async function bulkImportData(data: {
     // 1. Puxa os setores e cria um mapa na memória (MUITO mais rápido que ir no BD toda hora)
     const dbSectors = await prisma.sector.findMany({ where: { storeId } });
     const sectorCodeMap = new Map(
-      dbSectors.map((s) => [s.code.toUpperCase(), s.id]),
+      dbSectors.map((s) => [`${s.code.toUpperCase()}|${s.name.toUpperCase()}`, s.id]),
     );
 
     // 2. Cria os setores que faltam em lote
     for (const sec of data.sectors) {
-      if (!sectorCodeMap.has(sec.code.toUpperCase())) {
+      const key = `${sec.code.toUpperCase()}|${sec.name.toUpperCase()}`;
+      if (!sectorCodeMap.has(key)) {
         const newSec = await prisma.sector.create({
           data: { code: sec.code, name: sec.name, storeId },
         });
-        sectorCodeMap.set(newSec.code.toUpperCase(), newSec.id);
+        sectorCodeMap.set(key, newSec.id);
       }
     }
 
@@ -200,8 +205,8 @@ export async function bulkImportData(data: {
 
     // 4. Processa os itens usando os mapas de memória (Zero gargalo de rede)
     for (const csvItem of data.items) {
-      const idsDosSetores = csvItem.sectorCodes
-        .map((code) => sectorCodeMap.get(code.toUpperCase()))
+      const idsDosSetores = csvItem.sectorPairs
+        .map((sp) => sectorCodeMap.get(`${sp.code.toUpperCase()}|${sp.name.toUpperCase()}`))
         .filter(Boolean) as string[];
 
       const existingItem = itemCodeMap.get(csvItem.code.toUpperCase());
@@ -238,11 +243,11 @@ export async function bulkImportData(data: {
 
     revalidatePath("/admin");
     return { success: true, successCount, updatedCount };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro no Bulk Import:", error);
     return {
       success: false,
-      error: "Falha catastrófica ao processar o lote no servidor.",
+      error: `Falha ao processar o lote no servidor. Detalhes: ${error?.message || String(error)}`,
     };
   }
 }

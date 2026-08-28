@@ -293,7 +293,7 @@ export function ItemsAdmin() {
         await loadData();
         showAlert(
           "Importação Inteligente Concluída!",
-          `A sua planilha foi enviada com sucesso!\n\n✨ Insumos novos cadastrados: ${res.successCount}\n🔄 Insumos atualizados/amarrados: ${res.updatedCount}`,
+          `A sua planilha foi enviada com sucesso!\n\n Insumos novos cadastrados: ${res.successCount}\n Insumos atualizados/amarrados: ${res.updatedCount}`,
         );
       } else {
         showAlert(
@@ -329,6 +329,10 @@ export function ItemsAdmin() {
           <Button onClick={openNew}>
             <PlusIcon className="size-5 mr-1" />
             Novo Item
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteAll} disabled={items.length === 0}>
+            <TrashIcon className="size-5 mr-1" />
+            <span className="hidden sm:inline">Excluir Tudo</span>
           </Button>
         </div>
       </div>
@@ -554,11 +558,10 @@ export function ItemsAdmin() {
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div
-                className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
-                  feedback.type === "confirm"
+                className={`flex size-10 shrink-0 items-center justify-center rounded-full ${feedback.type === "confirm"
                     ? "bg-destructive/10"
                     : "bg-primary/10"
-                }`}
+                  }`}
               >
                 {feedback.type === "confirm" ? (
                   <ExclamationTriangleIcon className="size-5 text-destructive" />

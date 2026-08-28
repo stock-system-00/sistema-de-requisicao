@@ -1,17 +1,18 @@
-//components/csv-importer.tsx
 "use client";
 
 import { useRef } from "react";
 import { ArrowUpTrayIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 
-// Uma linha por par item+setor da planilha. O store faz o merge/dedup
-// (mesmo item em setores diferentes = linhas separadas com o mesmo `name`).
-export interface ParsedCSVItem {
-  name: string;
-  unit: string;
-  sectorName: string;
-  cost?: number;
+export interface SmartImportData {
+  items: {
+    code: string;
+    name: string;
+    unit: string;
+    cost?: number;
+    sectorPairs: { code: string; name: string }[];
+  }[];
+  sectors: { code: string; name: string }[];
 }
 
 // split() simples quebra quando tem delimitador dentro de aspas, então parseia char a char
@@ -37,7 +38,7 @@ function parseCSVLine(text: string, delimiter: string) {
 export function CsvImporter({
   onImport,
 }: {
-  onImport: (data: ParsedCSVItem[]) => void;
+  onImport: (data: SmartImportData) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -55,16 +56,11 @@ export function CsvImporter({
         .filter((l) => l);
       if (lines.length < 2) return;
 
-      // Delimitador detectado pelo cabeçalho: aceita export PT-BR (;) e CSV
-      // padrão (,) sem exigir configuração do usuário
       const delimiter = lines[0].includes(";") ? ";" : ",";
       const headers = lines[0]
         .split(delimiter)
         .map((h) => h.trim().toLowerCase());
 
-      // Matching por substring: a planilha não tem cabeçalho padronizado
-      // entre setores/origens diferentes. Ordem importa — "cod" bate em
-      // "cod item" e "cod setor", por isso "cod setor" exige "setor" junto.
       const idxDescItem = headers.findIndex((h) => h.includes("desc"));
       const idxUnit = headers.findIndex((h) => h.includes("uni"));
       const idxNomeSetor = headers.findIndex(
@@ -74,7 +70,32 @@ export function CsvImporter({
         (h) => h.includes("cust") || h.includes("preco") || h.includes("valor"),
       );
 
-      const rows: ParsedCSVItem[] = [];
+      let idxCodSetor = headers.findIndex((h) => h.includes("cod") && (h.includes("setor") || h.includes("almox")));
+      let idxCodItem = headers.findIndex((h) => h.includes("cod") && (h.includes("item") || h.includes("insumo")));
+
+      if (idxCodSetor === -1 || idxCodItem === -1) {
+         const allCodIdx = headers.map((h, i) => (h === "cod" || h.includes("código") || h === "codigo" || (h.includes("cod") && !h.includes("desc"))) ? i : -1).filter(i => i !== -1);
+         
+         if (idxCodSetor !== -1 && idxCodItem === -1) {
+           const fallbackItem = allCodIdx.find(i => i !== idxCodSetor);
+           if (fallbackItem !== undefined) idxCodItem = fallbackItem;
+         } else if (idxCodItem !== -1 && idxCodSetor === -1) {
+           const fallbackSector = allCodIdx.find(i => i !== idxCodItem);
+           if (fallbackSector !== undefined) idxCodSetor = fallbackSector;
+         } else if (allCodIdx.length >= 2) {
+           idxCodItem = allCodIdx[0]; 
+           idxCodSetor = allCodIdx[1];
+         }
+      }
+
+      if (idxCodSetor === -1 || idxCodItem === -1) {
+         alert("ERRO NA PLANILHA: Não foi possível identificar com clareza a coluna de 'Código do Setor' e 'Código do Item'. Por favor, nomeie os cabeçalhos como 'Cod Setor' e 'Cod Item' e tente novamente.");
+         if (fileRef.current) fileRef.current.value = "";
+         return;
+      }
+
+      const itemsMap = new Map<string, SmartImportData["items"][0]>();
+      const sectorsMap = new Map<string, { code: string; name: string }>();
 
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i], delimiter).map((c) =>
@@ -85,6 +106,9 @@ export function CsvImporter({
         const unit = (cols[idxUnit] || "UN").toUpperCase();
         const sectorName = cols[idxNomeSetor];
         const rawCost = idxCost !== -1 ? cols[idxCost] : undefined;
+        
+        const sectorCode = idxCodSetor !== -1 && cols[idxCodSetor] ? cols[idxCodSetor] : sectorName;
+        const itemCode = idxCodItem !== -1 && cols[idxCodItem] ? cols[idxCodItem] : name;
 
         if (!name || !sectorName) continue;
 
@@ -92,18 +116,38 @@ export function CsvImporter({
           ? parseFloat(rawCost.replace(".", "").replace(",", "."))
           : undefined;
 
-        rows.push({
-          name,
-          unit,
-          sectorName,
-          cost: cost !== undefined && !isNaN(cost) ? cost : undefined,
-        });
+        const sectorKey = `${sectorCode.toUpperCase()}|${sectorName.toUpperCase()}`;
+        if (!sectorsMap.has(sectorKey)) {
+          sectorsMap.set(sectorKey, { code: sectorCode, name: sectorName });
+        }
+
+        const itemKey = itemCode.toUpperCase();
+        if (!itemsMap.has(itemKey)) {
+          itemsMap.set(itemKey, {
+            code: itemCode,
+            name,
+            unit,
+            cost: cost !== undefined && !isNaN(cost) ? cost : undefined,
+            sectorPairs: [{ code: sectorCode, name: sectorName }],
+          });
+        } else {
+          const existingItem = itemsMap.get(itemKey)!;
+          const hasSector = existingItem.sectorPairs.some(
+             (s) => s.code.toUpperCase() === sectorCode.toUpperCase() && s.name.toUpperCase() === sectorName.toUpperCase()
+          );
+          if (!hasSector) {
+            existingItem.sectorPairs.push({ code: sectorCode, name: sectorName });
+          }
+        }
       }
 
-      onImport(rows);
+      const smartData: SmartImportData = {
+        items: Array.from(itemsMap.values()),
+        sectors: Array.from(sectorsMap.values()),
+      };
 
-      // Reseta o input pra permitir reimportar o mesmo arquivo (onChange não
-      // dispara se o value não mudar)
+      onImport(smartData);
+
       if (fileRef.current) fileRef.current.value = "";
     };
     reader.readAsText(file);
