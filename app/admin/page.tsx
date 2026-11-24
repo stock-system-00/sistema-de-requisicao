@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
 
 import { SectorsAdmin } from "@/components/sectors-admin";
 import { ItemsAdmin } from "./_components/items-admin";
+import { ErpSettingsAdmin } from "./_components/erp-settings-admin";
 
-type Tab = "sectors" | "items";
+type Tab = "sectors" | "items" | "erp";
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("sectors");
@@ -24,6 +25,7 @@ export default function AdminPage() {
                 [
                   { id: "sectors", label: "Setores" },
                   { id: "items", label: "Itens" },
+                  { id: "erp", label: "Almoxarifados ERP" },
                 ] as const
               ).map((t) => (
                 <button
@@ -47,6 +49,10 @@ export default function AdminPage() {
 
             <div className={cn(tab === "items" ? "block" : "hidden")}>
               <ItemsAdmin />
+            </div>
+
+            <div className={cn(tab === "erp" ? "block" : "hidden")}>
+              <ErpSettingsAdmin />
             </div>
           </div>
         </div>

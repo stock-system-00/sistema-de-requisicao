@@ -9,7 +9,16 @@ export interface FullRequisition {
   id: string;
   createdAt: Date;
   status: string;
-  sector: { id: string; name: string; code: string };
+  sector: {
+    id: string;
+    name: string;
+    code: string;
+    erpOriginCode?: string | null;
+    erpDestCode?: string | null;
+    store?: {
+      defaultOriginCode?: string | null;
+    };
+  };
   items: {
     id: string;
     quantity: number;
@@ -28,8 +37,19 @@ export const exportCSV = (reqs: FullRequisition[], title: string) => {
   let csvContent = "";
 
   reqs.forEach((req) => {
-    const codDestino = req.sector.code;
-    const codOrigem = "17"; // Almoxarifado Central — código fixo no ERP, não vem do banco
+    // 1. Destino: se houver erpDestCode definido no cadastro de almoxarifados ERP, usa ele; senão usa o código do setor
+    const codDestino =
+      (req.sector.erpDestCode && req.sector.erpDestCode.trim()) ||
+      req.sector.code;
+
+    // 2. Origem: se o setor tiver erpOriginCode personalizado, usa ele; senão usa a origem padrão da loja (ou "17")
+    const defaultStoreOrigin =
+      req.sector.store?.defaultOriginCode &&
+      req.sector.store.defaultOriginCode.trim();
+    const codOrigem =
+      (req.sector.erpOriginCode && req.sector.erpOriginCode.trim()) ||
+      defaultStoreOrigin ||
+      "17";
 
     req.items.forEach((reqItem) => {
       const codInsumo = reqItem.item.code;

@@ -11,6 +11,7 @@ model Store {
   id        String   @id @default(cuid())
   name      String
   cnpj      String?  @unique
+  defaultOriginCode String?  @default("17")
   
   // Relacionamentos
   users       User[]
@@ -47,6 +48,10 @@ model Sector {
   id        String   @id @default(cuid())
   code      String
   name      String
+
+  // Códigos para exportação ERP (se nulos, usa padrão de origem e código do setor como destino)
+  erpOriginCode String?
+  erpDestCode   String?
 
   storeId   String
   store     Store    @relation(fields: [storeId], references: [id])

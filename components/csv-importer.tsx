@@ -15,6 +15,14 @@ export interface SmartImportData {
   sectors: { code: string; name: string }[];
 }
 
+export interface ParsedCSVItem {
+  code: string;
+  name: string;
+  unit: string;
+  sectorName: string;
+  cost?: number;
+}
+
 // split() simples quebra quando tem delimitador dentro de aspas, então parseia char a char
 function parseCSVLine(text: string, delimiter: string) {
   const result = [];

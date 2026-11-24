@@ -132,7 +132,16 @@ export async function getRequisitions() {
       where: { storeId },
       include: {
         sector: {
-          select: { id: true, name: true, code: true },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            erpOriginCode: true,
+            erpDestCode: true,
+            store: {
+              select: { defaultOriginCode: true },
+            },
+          },
         },
         items: {
           include: {
