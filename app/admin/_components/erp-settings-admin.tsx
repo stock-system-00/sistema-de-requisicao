@@ -544,22 +544,7 @@ export function ErpSettingsAdmin() {
         </CardContent>
       </Card>
 
-      {/* ── Box de Dica / Exemplo Prático ── */}
-      <div className="rounded-lg border border-border bg-card/60 p-4 text-xs text-muted-foreground space-y-1.5">
-        <div className="font-medium text-foreground flex items-center gap-1.5">
-          <span>💡 Exemplo prático:</span>
-        </div>
-        <p>
-          Se os insumos de <strong>Embalagens - Lanchonete</strong> e{" "}
-          <strong>Material de limpeza - Lanchonete</strong> devem ir para a
-          planilha com destino <strong>50</strong>, basta preencher <strong>50</strong>{" "}
-          na coluna <strong>Destino (ERP)</strong> dessas linhas e clicar em salvar.
-        </p>
-        <p>
-          No momento em que você baixar o CSV no <strong>Histórico</strong>, o
-          sistema usará automaticamente o código <strong>50</strong> na coluna D.
-        </p>
-      </div>
+
     </div>
   );
 }
