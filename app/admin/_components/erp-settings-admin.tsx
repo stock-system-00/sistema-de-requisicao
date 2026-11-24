@@ -136,10 +136,10 @@ export function ErpSettingsAdmin() {
           prev.map((s) =>
             s.id === sector.id
               ? {
-                  ...s,
-                  erpOriginCode: draft.origin.trim() || null,
-                  erpDestCode: draft.dest.trim() || null,
-                }
+                ...s,
+                erpOriginCode: draft.origin.trim() || null,
+                erpDestCode: draft.dest.trim() || null,
+              }
               : s,
           ),
         );
@@ -264,7 +264,6 @@ export function ErpSettingsAdmin() {
               <code className="rounded bg-blue-100 px-1 py-0.5 text-xs font-mono font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                 [Código Produto] ; [Quantidade] ; [Almoxarifado Origem] ; [Almoxarifado Destino]
               </code>
-              . Aqui você configura de onde os produtos saem e para onde entram sem precisar mexer em programação.
             </p>
           </div>
         </div>
@@ -425,7 +424,7 @@ export function ErpSettingsAdmin() {
                     );
                     const hasCustomOrigin = Boolean(
                       draft.origin.trim() &&
-                        draft.origin.trim() !== defaultOrigin,
+                      draft.origin.trim() !== defaultOrigin,
                     );
 
                     const hasChanges =
